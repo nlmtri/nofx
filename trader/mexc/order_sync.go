@@ -195,7 +195,7 @@ func (t *MEXCTrader) SyncOrdersFromMEXC(traderID, exchangeID, exchangeType strin
 			Status:          "FILLED",
 			FilledQuantity:  tr.FillQty,
 			AvgFillPrice:    tr.FillPrice,
-			Commission:      -tr.Fee,
+			Commission:      tr.Fee,
 			FilledAt:        execMs,
 			CreatedAt:       execMs,
 			UpdatedAt:       execMs,
@@ -217,7 +217,7 @@ func (t *MEXCTrader) SyncOrdersFromMEXC(traderID, exchangeID, exchangeType strin
 			Price:           tr.FillPrice,
 			Quantity:        tr.FillQty,
 			QuoteQuantity:   tr.FillPrice * tr.FillQty,
-			Commission:      -tr.Fee,
+			Commission:      tr.Fee,
 			CommissionAsset: tr.FeeAsset,
 			RealizedPnL:     tr.ProfitLoss,
 			IsMaker:         false,
@@ -230,7 +230,7 @@ func (t *MEXCTrader) SyncOrdersFromMEXC(traderID, exchangeID, exchangeType strin
 		if err := posBuilder.ProcessTrade(
 			traderID, exchangeID, exchangeType,
 			symbol, positionSide, tr.OrderAction,
-			tr.FillQty, tr.FillPrice, -tr.Fee, tr.ProfitLoss,
+			tr.FillQty, tr.FillPrice, tr.Fee, tr.ProfitLoss,
 			execMs, tr.OrderID,
 		); err != nil {
 			logger.Infof("  ⚠️ Failed to sync MEXC position for %s: %v", tr.OrderID, err)

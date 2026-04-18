@@ -130,7 +130,7 @@ func (t *MEXCTrader) GetClosedPnL(startTime time.Time, limit int) ([]types.Close
 			ExitPrice:   o.DealAvgPrice,
 			Quantity:    qty,
 			RealizedPnL: o.Profit,
-			Fee:         -(o.TakerFee + o.MakerFee),
+			Fee:         o.TakerFee + o.MakerFee,
 			Leverage:    o.Leverage,
 			EntryTime:   time.UnixMilli(o.CreateTime).UTC(),
 			ExitTime:    time.UnixMilli(o.UpdateTime).UTC(),
