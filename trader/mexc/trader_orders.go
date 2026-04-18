@@ -50,7 +50,7 @@ func (t *MEXCTrader) submitOrder(symbol string, side, orderType int, vol int64, 
 		"type":         orderType,
 		"vol":          vol,
 		"openType":     t.openType(), // 1 isolated, 2 cross (from SetMarginMode)
-		"positionMode": 2,             // 2 = one-way, 1 = dual-side (hedge)
+		"positionMode": 1,             // 1 = dual-side (hedge, MEXC default), 2 = one-way
 		"externalOid":  genMEXCExternalOID(),
 	}
 	// Leverage required on opens.
