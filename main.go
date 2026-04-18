@@ -11,6 +11,7 @@ import (
 	_ "nofx/mcp/payment"
 	_ "nofx/mcp/provider"
 	"nofx/store"
+	_ "nofx/wsoverride"
 	"nofx/telegram"
 	"os"
 	"os/signal"
