@@ -32,12 +32,39 @@ const (
 	mexcOrderTypeClosePosition = 6
 )
 
-// Plan order trigger types.
-//   1 = Stop-loss, 2 = Take-profit
+// Plan order trigger comparison operator (MEXC docs: "triggerType").
+//   1 = greater than or equal to (fires when price rises through trigger)
+//   2 = less than or equal to    (fires when price drops through trigger)
+// NOTE: This is NOT a stop-loss vs take-profit flag — the SL/TP nature is
+// derived from (positionSide, comparison) together. See resolveTriggerType().
 const (
-	mexcTriggerTypeStopLoss   = 1
-	mexcTriggerTypeTakeProfit = 2
+	mexcTriggerGTE = 1
+	mexcTriggerLTE = 2
 )
+
+// resolveTriggerType returns MEXC triggerType given (positionSide, isStopLoss).
+//
+//   LONG  + SL → price drops ≤ stop → LTE (2)
+//   LONG  + TP → price rises ≥ target → GTE (1)
+//   SHORT + SL → price rises ≥ stop → GTE (1)
+//   SHORT + TP → price drops ≤ target → LTE (2)
+func resolveTriggerType(positionSide string, isStopLoss bool) int {
+	isShort := strings.EqualFold(positionSide, "SHORT")
+	if isStopLoss == isShort {
+		return mexcTriggerGTE
+	}
+	return mexcTriggerLTE
+}
+
+// isStopLossPlanOrder classifies a listed plan order as stop-loss (true) or take-profit (false)
+// using the (closing-side, triggerType) pair.
+//   (close long=4, LTE=2) → LONG SL
+//   (close short=2, GTE=1) → SHORT SL
+// Everything else that closes a position = TP.
+func isStopLossPlanOrder(side, triggerType int) bool {
+	return (side == mexcSideCloseLong && triggerType == mexcTriggerLTE) ||
+		(side == mexcSideCloseShort && triggerType == mexcTriggerGTE)
+}
 
 // submitOrder is the unified order submission helper.
 // leverage is only passed through on opening sides (docs: "leverage must be
@@ -195,9 +222,10 @@ func (t *MEXCTrader) CloseShort(symbol string, quantity float64) (map[string]int
 	return map[string]interface{}{"orderId": orderID, "symbol": sym, "status": "FILLED"}, nil
 }
 
-// placePlanOrder places a stop-loss/take-profit plan order.
+// placePlanOrder places a stop-loss (isStopLoss=true) or take-profit plan order.
 // MEXC /planorder/place/v2 requires `leverage`; derive from current position, fall back to 10.
-func (t *MEXCTrader) placePlanOrder(sym string, positionSide string, quantity, triggerPrice float64, triggerType int) error {
+// triggerType is derived from (positionSide, isStopLoss) — see resolveTriggerType.
+func (t *MEXCTrader) placePlanOrder(sym string, positionSide string, quantity, triggerPrice float64, isStopLoss bool) error {
 	vol, err := t.qtyToContracts(sym, quantity)
 	if err != nil || vol <= 0 {
 		return fmt.Errorf("plan order invalid qty (%f): %v", quantity, err)
@@ -231,7 +259,7 @@ func (t *MEXCTrader) placePlanOrder(sym string, positionSide string, quantity, t
 		"vol":          vol,
 		"leverage":     leverage,
 		"triggerPrice": triggerPrice,
-		"triggerType":  triggerType,
+		"triggerType":  resolveTriggerType(positionSide, isStopLoss),
 		"executeCycle": 1,
 		"orderType":    mexcOrderTypeMarket,
 		"trend":        1, // latest price
@@ -243,26 +271,27 @@ func (t *MEXCTrader) placePlanOrder(sym string, positionSide string, quantity, t
 // SetStopLoss places a stop-loss plan order.
 func (t *MEXCTrader) SetStopLoss(symbol string, positionSide string, quantity, stopPrice float64) error {
 	sym := t.normalizeSymbol(symbol)
-	if err := t.placePlanOrder(sym, positionSide, quantity, stopPrice, mexcTriggerTypeStopLoss); err != nil {
+	if err := t.placePlanOrder(sym, positionSide, quantity, stopPrice, true); err != nil {
 		return fmt.Errorf("failed to set stop loss: %w", err)
 	}
-	logger.Infof("  ✓ [MEXC] Stop loss set: %s @ %.4f", sym, stopPrice)
+	logger.Infof("  ✓ [MEXC] Stop loss set: %s %s @ %.4f", sym, positionSide, stopPrice)
 	return nil
 }
 
 // SetTakeProfit places a take-profit plan order.
 func (t *MEXCTrader) SetTakeProfit(symbol string, positionSide string, quantity, takeProfitPrice float64) error {
 	sym := t.normalizeSymbol(symbol)
-	if err := t.placePlanOrder(sym, positionSide, quantity, takeProfitPrice, mexcTriggerTypeTakeProfit); err != nil {
+	if err := t.placePlanOrder(sym, positionSide, quantity, takeProfitPrice, false); err != nil {
 		return fmt.Errorf("failed to set take profit: %w", err)
 	}
-	logger.Infof("  ✓ [MEXC] Take profit set: %s @ %.4f", sym, takeProfitPrice)
+	logger.Infof("  ✓ [MEXC] Take profit set: %s %s @ %.4f", sym, positionSide, takeProfitPrice)
 	return nil
 }
 
-// listPlanOrders returns open plan orders filtered by triggerType (0 = all).
+// listPlanOrders returns untriggered plan orders (optionally filtered by symbol).
+// Caller classifies SL vs TP via isStopLossPlanOrder(side, triggerType).
 // MEXC requires start_time + end_time + page_num + page_size.
-func (t *MEXCTrader) listPlanOrders(sym string, triggerType int) ([]mexcPlanOrder, error) {
+func (t *MEXCTrader) listPlanOrders(sym string) ([]mexcPlanOrder, error) {
 	params := url.Values{}
 	if sym != "" {
 		params.Set("symbol", sym)
@@ -282,16 +311,7 @@ func (t *MEXCTrader) listPlanOrders(sym string, triggerType int) ([]mexcPlanOrde
 	if err := json.Unmarshal(data, &all); err != nil {
 		return nil, err
 	}
-	if triggerType == 0 {
-		return all, nil
-	}
-	filtered := make([]mexcPlanOrder, 0, len(all))
-	for _, p := range all {
-		if p.TriggerType == triggerType {
-			filtered = append(filtered, p)
-		}
-	}
-	return filtered, nil
+	return all, nil
 }
 
 type mexcPlanOrder struct {
@@ -325,22 +345,34 @@ func (t *MEXCTrader) cancelPlanOrdersBy(orders []mexcPlanOrder) {
 // CancelStopLossOrders cancels all SL plan orders for a symbol.
 func (t *MEXCTrader) CancelStopLossOrders(symbol string) error {
 	sym := t.normalizeSymbol(symbol)
-	orders, err := t.listPlanOrders(sym, mexcTriggerTypeStopLoss)
+	all, err := t.listPlanOrders(sym)
 	if err != nil {
 		return err
 	}
-	t.cancelPlanOrdersBy(orders)
+	sls := make([]mexcPlanOrder, 0, len(all))
+	for _, p := range all {
+		if isStopLossPlanOrder(p.Side, p.TriggerType) {
+			sls = append(sls, p)
+		}
+	}
+	t.cancelPlanOrdersBy(sls)
 	return nil
 }
 
 // CancelTakeProfitOrders cancels all TP plan orders for a symbol.
 func (t *MEXCTrader) CancelTakeProfitOrders(symbol string) error {
 	sym := t.normalizeSymbol(symbol)
-	orders, err := t.listPlanOrders(sym, mexcTriggerTypeTakeProfit)
+	all, err := t.listPlanOrders(sym)
 	if err != nil {
 		return err
 	}
-	t.cancelPlanOrdersBy(orders)
+	tps := make([]mexcPlanOrder, 0, len(all))
+	for _, p := range all {
+		if !isStopLossPlanOrder(p.Side, p.TriggerType) {
+			tps = append(tps, p)
+		}
+	}
+	t.cancelPlanOrdersBy(tps)
 	return nil
 }
 
@@ -473,8 +505,8 @@ func (t *MEXCTrader) GetOpenOrders(symbol string) ([]types.OpenOrder, error) {
 		logger.Warnf("[MEXC] GetOpenOrders regular failed: %v", err)
 	}
 
-	// 2. Plan orders (SL/TP)
-	plans, err := t.listPlanOrders(sym, 0)
+	// 2. Plan orders (SL/TP) — classify by (side, triggerType).
+	plans, err := t.listPlanOrders(sym)
 	if err != nil {
 		logger.Warnf("[MEXC] GetOpenOrders plan failed: %v", err)
 	} else {
@@ -482,9 +514,9 @@ func (t *MEXCTrader) GetOpenOrders(symbol string) ([]types.OpenOrder, error) {
 			qty, _ := t.contractsToQty(p.Symbol, int64(p.Vol))
 			side, pside := mexcSideToPositionSide(p.Side)
 
-			kind := "STOP_MARKET"
-			if p.TriggerType == mexcTriggerTypeTakeProfit {
-				kind = "TAKE_PROFIT_MARKET"
+			kind := "TAKE_PROFIT_MARKET"
+			if isStopLossPlanOrder(p.Side, p.TriggerType) {
+				kind = "STOP_MARKET"
 			}
 			result = append(result, types.OpenOrder{
 				OrderID:      strconv.FormatInt(p.ID, 10),
