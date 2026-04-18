@@ -9,6 +9,7 @@ import (
 	"nofx/trader/types"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // MEXC order side codes (contract API v1). Critical — not intuitive:
@@ -237,12 +238,17 @@ func (t *MEXCTrader) SetTakeProfit(symbol string, positionSide string, quantity,
 }
 
 // listPlanOrders returns open plan orders filtered by triggerType (0 = all).
+// MEXC requires start_time + end_time + page_num + page_size.
 func (t *MEXCTrader) listPlanOrders(sym string, triggerType int) ([]mexcPlanOrder, error) {
 	params := url.Values{}
 	if sym != "" {
 		params.Set("symbol", sym)
 	}
 	params.Set("states", "1") // 1 = untriggered
+	params.Set("start_time", strconv.FormatInt(time.Now().Add(-7*24*time.Hour).UnixMilli(), 10))
+	params.Set("end_time", strconv.FormatInt(time.Now().UnixMilli(), 10))
+	params.Set("page_num", "1")
+	params.Set("page_size", "100")
 
 	data, err := t.doRequest(http.MethodGet, mexcPlanOrderListPath, params, nil)
 	if err != nil {
@@ -275,12 +281,20 @@ type mexcPlanOrder struct {
 	State        int     `json:"state"`
 }
 
-// cancelPlanOrdersBy cancels the listed plan orders by ID.
+// cancelPlanOrdersBy cancels plan orders in one batched POST (max 50 per call).
 func (t *MEXCTrader) cancelPlanOrdersBy(orders []mexcPlanOrder) {
-	for _, o := range orders {
-		body := []map[string]interface{}{{"symbol": o.Symbol, "orderId": o.ID}}
-		if _, err := t.doRequest(http.MethodPost, mexcPlanOrderCancelAllPath, nil, body); err != nil {
-			logger.Warnf("[MEXC] plan cancel failed id=%d: %v", o.ID, err)
+	const batchSize = 50
+	for i := 0; i < len(orders); i += batchSize {
+		end := i + batchSize
+		if end > len(orders) {
+			end = len(orders)
+		}
+		body := make([]map[string]interface{}, 0, end-i)
+		for _, o := range orders[i:end] {
+			body = append(body, map[string]interface{}{"symbol": o.Symbol, "orderId": o.ID})
+		}
+		if _, err := t.doRequest(http.MethodPost, mexcPlanOrderCancelPath, nil, body); err != nil {
+			logger.Warnf("[MEXC] plan cancel batch failed: %v", err)
 		}
 	}
 }
@@ -318,8 +332,8 @@ func (t *MEXCTrader) CancelStopOrders(symbol string) error {
 func (t *MEXCTrader) CancelAllOrders(symbol string) error {
 	sym := t.normalizeSymbol(symbol)
 
-	// Regular orders
-	body := []string{sym}
+	// Regular orders — body is a JSON object with `symbol` field per docs.
+	body := map[string]interface{}{"symbol": sym}
 	if _, err := t.doRequest(http.MethodPost, mexcOrderCancelAllPath, nil, body); err != nil {
 		logger.Warnf("[MEXC] cancel regular failed %s: %v", sym, err)
 	}
@@ -393,11 +407,13 @@ func (t *MEXCTrader) GetOpenOrders(symbol string) ([]types.OpenOrder, error) {
 	sym := t.normalizeSymbol(symbol)
 	var result []types.OpenOrder
 
-	// 1. Regular orders
+	// 1. Regular orders — MEXC requires page_num + page_size.
 	params := url.Values{}
 	if sym != "" {
 		params.Set("symbol", sym)
 	}
+	params.Set("page_num", "1")
+	params.Set("page_size", "100")
 	data, err := t.doRequest(http.MethodGet, mexcOrderListOpenPath, params, nil)
 	if err == nil && data != nil {
 		var orders []struct {

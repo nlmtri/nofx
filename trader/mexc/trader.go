@@ -38,18 +38,17 @@ const (
 	mexcPositionMarginTypePath = "/api/v1/private/position/change_margin"
 
 	// Private - orders
-	mexcOrderSubmitPath        = "/api/v1/private/order/submit"
-	mexcOrderCancelPath        = "/api/v1/private/order/cancel"
-	mexcOrderCancelAllPath     = "/api/v1/private/order/cancel_all"
-	mexcOrderListOpenPath      = "/api/v1/private/order/list/open_orders"
-	mexcOrderListHistoryPath   = "/api/v1/private/order/list/history_orders"
-	mexcOrderDealsPath         = "/api/v1/private/order/deals"
-	mexcOrderGetByIDPath       = "/api/v1/private/order/get"
+	mexcOrderSubmitPath      = "/api/v1/private/order/create"
+	mexcOrderCancelPath      = "/api/v1/private/order/cancel"
+	mexcOrderCancelAllPath   = "/api/v1/private/order/cancel_all"
+	mexcOrderListOpenPath    = "/api/v1/private/order/list/open_orders"
+	mexcOrderListHistoryPath = "/api/v1/private/order/list/history_orders"
+	mexcOrderGetByIDPath     = "/api/v1/private/order/get"
 
 	// Private - plan orders (SL/TP)
-	mexcPlanOrderPlacePath      = "/api/v1/private/planorder/place"
-	mexcPlanOrderCancelAllPath  = "/api/v1/private/planorder/cancel_all"
-	mexcPlanOrderListPath       = "/api/v1/private/planorder/list/orders"
+	mexcPlanOrderPlacePath  = "/api/v1/private/planorder/place/v2"
+	mexcPlanOrderCancelPath = "/api/v1/private/planorder/cancel"
+	mexcPlanOrderListPath   = "/api/v1/private/planorder/list/orders"
 )
 
 // MEXCTrader MEXC futures trader
@@ -180,13 +179,18 @@ func (t *MEXCTrader) doRequest(method, path string, params url.Values, body inte
 	}
 
 	if isAuth {
-		req.Header.Set("ApiKey", t.apiKey)
-		req.Header.Set("Request-Time", timestamp)
-		req.Header.Set("Signature", t.sign(timestamp, signPayload))
+		// Bypass Go's header canonicalisation — MEXC validates exact case `ApiKey`.
+		req.Header["ApiKey"] = []string{t.apiKey}
+		req.Header["Request-Time"] = []string{timestamp}
+		req.Header["Signature"] = []string{t.sign(timestamp, signPayload)}
 	}
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	// MEXC CDN (Akamai) rejects default Go User-Agent. Set a browser-like UA.
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 
 	resp, err := t.httpClient.Do(req)
 	if err != nil {

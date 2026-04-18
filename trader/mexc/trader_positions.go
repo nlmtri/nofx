@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"nofx/trader/types"
 	"strconv"
 	"time"
@@ -101,75 +100,44 @@ func (t *MEXCTrader) GetPositions() ([]map[string]interface{}, error) {
 	return result, nil
 }
 
-// GetClosedPnL retrieves closed position PnL records from MEXC order history.
-// MEXC does not expose a position-history endpoint, so we aggregate closing deals.
+// GetClosedPnL retrieves closed position PnL records from MEXC history orders.
+// Filters state=3 (filled) + side ∈ {2 close short, 4 close long}.
 func (t *MEXCTrader) GetClosedPnL(startTime time.Time, limit int) ([]types.ClosedPnLRecord, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-	if limit > 100 {
-		limit = 100
-	}
-
-	params := url.Values{}
-	params.Set("start_time", strconv.FormatInt(startTime.UnixMilli(), 10))
-	params.Set("end_time", strconv.FormatInt(time.Now().UnixMilli(), 10))
-	params.Set("page_num", "1")
-	params.Set("page_size", strconv.Itoa(limit))
-
-	data, err := t.doRequest(http.MethodGet, mexcOrderDealsPath, params, nil)
+	orders, err := t.fetchFilledHistory(startTime, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get MEXC deals: %w", err)
+		return nil, err
 	}
 
-	var deals []struct {
-		Symbol      string  `json:"symbol"`
-		OrderID     string  `json:"orderId"`
-		Side        int     `json:"side"`        // 1=open long, 2=close short, 3=open short, 4=close long
-		Price       float64 `json:"price"`
-		Vol         float64 `json:"vol"`         // contracts
-		Leverage    int     `json:"leverage"`
-		Fee         float64 `json:"fee"`
-		FeeCurrency string  `json:"feeCurrency"`
-		Profit      float64 `json:"profit"`
-		Timestamp   int64   `json:"timestamp"`
-	}
-	if err := json.Unmarshal(data, &deals); err != nil {
-		return nil, fmt.Errorf("failed to parse MEXC deals: %w", err)
-	}
-
-	records := make([]types.ClosedPnLRecord, 0, len(deals))
-	for _, d := range deals {
-		// Only closing deals have realized pnl.
-		if d.Side != 2 && d.Side != 4 {
+	records := make([]types.ClosedPnLRecord, 0, len(orders))
+	for _, o := range orders {
+		// Only closing orders carry realized PnL.
+		if o.Side != mexcSideCloseShort && o.Side != mexcSideCloseLong {
 			continue
 		}
 
-		qty, err := t.contractsToQty(d.Symbol, int64(d.Vol))
+		qty, err := t.contractsToQty(o.Symbol, int64(o.DealVol))
 		if err != nil {
-			qty = d.Vol
+			qty = o.DealVol
 		}
 
 		side := "long"
-		if d.Side == 2 {
-			// Close short = we had short position.
+		if o.Side == mexcSideCloseShort {
 			side = "short"
 		}
 
-		rec := types.ClosedPnLRecord{
-			Symbol:      d.Symbol,
+		records = append(records, types.ClosedPnLRecord{
+			Symbol:      o.Symbol,
 			Side:        side,
-			ExitPrice:   d.Price,
+			ExitPrice:   o.DealAvgPrice,
 			Quantity:    qty,
-			RealizedPnL: d.Profit,
-			Fee:         -d.Fee,
-			Leverage:    d.Leverage,
-			ExitTime:    time.UnixMilli(d.Timestamp).UTC(),
-			EntryTime:   time.UnixMilli(d.Timestamp).UTC(),
-			OrderID:     d.OrderID,
+			RealizedPnL: o.Profit,
+			Fee:         -(o.TakerFee + o.MakerFee),
+			Leverage:    o.Leverage,
+			EntryTime:   time.UnixMilli(o.CreateTime).UTC(),
+			ExitTime:    time.UnixMilli(o.UpdateTime).UTC(),
+			OrderID:     strconv.FormatInt(o.OrderID, 10),
 			CloseType:   "unknown",
-		}
-		records = append(records, rec)
+		})
 	}
 
 	return records, nil
