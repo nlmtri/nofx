@@ -74,6 +74,11 @@ type MEXCTrader struct {
 	contractsCacheMutex sync.RWMutex
 
 	cacheDuration time.Duration
+
+	// Margin mode (openType for order/leverage calls). Set via SetMarginMode.
+	// Default = isolated (1). 2 = cross.
+	marginModeMutex sync.RWMutex
+	isCrossMargin   bool
 }
 
 // MEXCContract contract spec from /api/v1/contract/detail
@@ -316,6 +321,16 @@ func (t *MEXCTrader) FormatQuantity(symbol string, quantity float64) (string, er
 		return strconv.FormatFloat(quantity, 'f', 4, 64), nil
 	}
 	return strconv.FormatFloat(quantity, 'f', c.VolScale, 64), nil
+}
+
+// openType returns MEXC's margin-mode code: 1 isolated, 2 cross.
+func (t *MEXCTrader) openType() int {
+	t.marginModeMutex.RLock()
+	defer t.marginModeMutex.RUnlock()
+	if t.isCrossMargin {
+		return 2
+	}
+	return 1
 }
 
 // clearCache invalidates balance + positions caches after mutations.

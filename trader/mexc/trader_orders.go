@@ -49,8 +49,8 @@ func (t *MEXCTrader) submitOrder(symbol string, side, orderType int, vol int64, 
 		"side":         side,
 		"type":         orderType,
 		"vol":          vol,
-		"openType":     1, // 1 = isolated margin, 2 = cross
-		"positionMode": 2, // 2 = one-way, 1 = dual-side (hedge)
+		"openType":     t.openType(), // 1 isolated, 2 cross (from SetMarginMode)
+		"positionMode": 2,             // 2 = one-way, 1 = dual-side (hedge)
 		"externalOid":  genMEXCExternalOID(),
 	}
 	// Leverage required on opens.
@@ -227,7 +227,7 @@ func (t *MEXCTrader) placePlanOrder(sym string, positionSide string, quantity, t
 	body := map[string]interface{}{
 		"symbol":       sym,
 		"side":         closeSide,
-		"openType":     1,
+		"openType":     t.openType(),
 		"vol":          vol,
 		"leverage":     leverage,
 		"triggerPrice": triggerPrice,

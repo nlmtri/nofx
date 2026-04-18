@@ -109,8 +109,8 @@ func (t *MEXCTrader) SetLeverage(symbol string, leverage int) error {
 	body := map[string]interface{}{
 		"symbol":       sym,
 		"leverage":     leverage,
-		"openType":     1,
-		"positionType": 1,
+		"openType":     t.openType(),
+		"positionType": 1, // 1 = one-way long bucket; MEXC ignores for one-way mode
 	}
 
 	_, err := t.doRequest(http.MethodPost, mexcPositionLeveragePath, nil, body)
@@ -126,11 +126,18 @@ func (t *MEXCTrader) SetLeverage(symbol string, leverage int) error {
 	return nil
 }
 
-// SetMarginMode logs a warning if cross requested; MEXC supports per-symbol isolated/cross
-// but NOFX behavior matches isolated. We return nil either way (non-fatal).
+// SetMarginMode stores the margin mode used on subsequent order/leverage calls.
+// MEXC applies openType per-order (1 isolated, 2 cross) rather than a global switch,
+// so here we just remember the user's choice and inject on each call.
 func (t *MEXCTrader) SetMarginMode(symbol string, isCrossMargin bool) error {
+	t.marginModeMutex.Lock()
+	t.isCrossMargin = isCrossMargin
+	t.marginModeMutex.Unlock()
+
+	mode := "isolated"
 	if isCrossMargin {
-		logger.Warnf("[MEXC] Cross margin not wired, using isolated for %s", t.normalizeSymbol(symbol))
+		mode = "cross"
 	}
+	logger.Infof("  ✓ [MEXC] Margin mode set to %s for %s (applies on next order)", mode, t.normalizeSymbol(symbol))
 	return nil
 }
