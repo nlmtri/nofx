@@ -57,10 +57,12 @@ func (t *MEXCTrader) fetchFilledHistory(startTime time.Time, limit int) ([]mexcH
 	if limit <= 0 || limit > 100 {
 		limit = 100
 	}
+	// MEXC history_orders uses camelCase for time params (startTime/endTime),
+	// but snake_case for pagination (page_num/page_size). Mixed by design.
 	params := url.Values{}
 	params.Set("states", "3") // 3 = filled
-	params.Set("start_time", strconv.FormatInt(startTime.UnixMilli(), 10))
-	params.Set("end_time", strconv.FormatInt(time.Now().UnixMilli(), 10))
+	params.Set("startTime", strconv.FormatInt(startTime.UnixMilli(), 10))
+	params.Set("endTime", strconv.FormatInt(time.Now().UnixMilli(), 10))
 	params.Set("page_num", "1")
 	params.Set("page_size", strconv.Itoa(limit))
 

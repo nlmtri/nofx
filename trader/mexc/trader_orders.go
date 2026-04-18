@@ -190,6 +190,7 @@ func (t *MEXCTrader) CloseShort(symbol string, quantity float64) (map[string]int
 }
 
 // placePlanOrder places a stop-loss/take-profit plan order.
+// MEXC /planorder/place/v2 requires `leverage`; derive from current position, fall back to 10.
 func (t *MEXCTrader) placePlanOrder(sym string, positionSide string, quantity, triggerPrice float64, triggerType int) error {
 	vol, err := t.qtyToContracts(sym, quantity)
 	if err != nil || vol <= 0 {
@@ -198,20 +199,36 @@ func (t *MEXCTrader) placePlanOrder(sym string, positionSide string, quantity, t
 
 	// Closing side depends on which position it protects.
 	closeSide := mexcSideCloseLong
+	wantSide := "long"
 	if strings.EqualFold(positionSide, "SHORT") {
 		closeSide = mexcSideCloseShort
+		wantSide = "short"
+	}
+
+	// Use leverage from current open position (MEXC requires this field on plan orders).
+	leverage := 10
+	if positions, err := t.GetPositions(); err == nil {
+		for _, p := range positions {
+			if p["symbol"] == sym && p["side"] == wantSide {
+				if lev, ok := p["leverage"].(float64); ok && lev > 0 {
+					leverage = int(lev)
+				}
+				break
+			}
+		}
 	}
 
 	body := map[string]interface{}{
-		"symbol":        sym,
-		"side":          closeSide,
-		"openType":      1,
-		"vol":           vol,
-		"triggerPrice":  triggerPrice,
-		"triggerType":   triggerType,
-		"executeCycle":  1,
-		"orderType":     mexcOrderTypeMarket,
-		"trend":         1, // latest price
+		"symbol":       sym,
+		"side":         closeSide,
+		"openType":     1,
+		"vol":          vol,
+		"leverage":     leverage,
+		"triggerPrice": triggerPrice,
+		"triggerType":  triggerType,
+		"executeCycle": 1,
+		"orderType":    mexcOrderTypeMarket,
+		"trend":        1, // latest price
 	}
 	_, err = t.doRequest(http.MethodPost, mexcPlanOrderPlacePath, nil, body)
 	return err
