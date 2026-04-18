@@ -40,16 +40,22 @@ const (
 )
 
 // submitOrder is the unified order submission helper.
+// leverage is only passed through on opening sides (docs: "leverage must be
+// provided when opening a position"). Closes derive leverage from position.
 // Returns orderID string.
-func (t *MEXCTrader) submitOrder(symbol string, side, orderType int, vol int64, price float64, extra map[string]interface{}) (string, error) {
+func (t *MEXCTrader) submitOrder(symbol string, side, orderType int, vol int64, price float64, leverage int, extra map[string]interface{}) (string, error) {
 	body := map[string]interface{}{
 		"symbol":       symbol,
 		"side":         side,
 		"type":         orderType,
 		"vol":          vol,
-		"openType":     1, // isolated
-		"positionMode": 1, // one-way
+		"openType":     1, // 1 = isolated margin, 2 = cross
+		"positionMode": 2, // 2 = one-way, 1 = dual-side (hedge)
 		"externalOid":  genMEXCExternalOID(),
+	}
+	// Leverage required on opens.
+	if (side == mexcSideOpenLong || side == mexcSideOpenShort) && leverage > 0 {
+		body["leverage"] = leverage
 	}
 	if price > 0 && orderType != mexcOrderTypeMarket && orderType != mexcOrderTypeClosePosition {
 		body["price"] = price
@@ -92,7 +98,7 @@ func (t *MEXCTrader) OpenLong(symbol string, quantity float64, leverage int) (ma
 
 	logger.Infof("  📊 [MEXC] OpenLong: symbol=%s, vol=%d, leverage=%d", sym, vol, leverage)
 
-	orderID, err := t.submitOrder(sym, mexcSideOpenLong, mexcOrderTypeMarket, vol, 0, nil)
+	orderID, err := t.submitOrder(sym, mexcSideOpenLong, mexcOrderTypeMarket, vol, 0, leverage, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open long: %w", err)
 	}
@@ -121,7 +127,7 @@ func (t *MEXCTrader) OpenShort(symbol string, quantity float64, leverage int) (m
 
 	logger.Infof("  📊 [MEXC] OpenShort: symbol=%s, vol=%d, leverage=%d", sym, vol, leverage)
 
-	orderID, err := t.submitOrder(sym, mexcSideOpenShort, mexcOrderTypeMarket, vol, 0, nil)
+	orderID, err := t.submitOrder(sym, mexcSideOpenShort, mexcOrderTypeMarket, vol, 0, leverage, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open short: %w", err)
 	}
@@ -163,7 +169,7 @@ func (t *MEXCTrader) CloseLong(symbol string, quantity float64) (map[string]inte
 		return nil, fmt.Errorf("CloseLong: %v", err)
 	}
 	logger.Infof("  📊 [MEXC] CloseLong: symbol=%s vol=%d", sym, vol)
-	orderID, err := t.submitOrder(sym, mexcSideCloseLong, mexcOrderTypeMarket, vol, 0, nil)
+	orderID, err := t.submitOrder(sym, mexcSideCloseLong, mexcOrderTypeMarket, vol, 0, 0, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to close long: %w", err)
 	}
@@ -180,7 +186,7 @@ func (t *MEXCTrader) CloseShort(symbol string, quantity float64) (map[string]int
 		return nil, fmt.Errorf("CloseShort: %v", err)
 	}
 	logger.Infof("  📊 [MEXC] CloseShort: symbol=%s vol=%d", sym, vol)
-	orderID, err := t.submitOrder(sym, mexcSideCloseShort, mexcOrderTypeMarket, vol, 0, nil)
+	orderID, err := t.submitOrder(sym, mexcSideCloseShort, mexcOrderTypeMarket, vol, 0, 0, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to close short: %w", err)
 	}
