@@ -206,9 +206,9 @@ Use this endpoint to show balance and health in the exchange list without depend
 				s.handleGetExchangeAccountStates)
 			s.routeWithSchema(protected, "POST", "/exchanges", "Create a new exchange account",
 				`Body: {"exchange_type":"<string>","account_name":"<string, user label>","enabled":true,"api_key":"<string>","secret_key":"<string>","passphrase":"<string, required for okx/gate/kucoin>"}
-exchange_type values: "binance","bybit","okx","bitget","gate","kucoin","indodax" (CEX) | "hyperliquid","aster","lighter" (DEX)
+exchange_type values: "binance","bybit","okx","bitget","gate","kucoin","indodax","mexc" (CEX) | "hyperliquid","aster","lighter" (DEX)
 Required fields by exchange:
-  binance/bybit/bitget/indodax: api_key + secret_key
+  binance/bybit/bitget/indodax/mexc: api_key + secret_key
   okx/gate/kucoin: api_key + secret_key + passphrase
   hyperliquid: hyperliquid_wallet_addr
   aster: aster_user + aster_signer + aster_private_key

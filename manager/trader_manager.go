@@ -673,6 +673,9 @@ func (tm *TraderManager) addTraderFromStore(traderCfg *store.Trader, aiModelCfg 
 		traderConfig.KuCoinAPIKey = string(exchangeCfg.APIKey)
 		traderConfig.KuCoinSecretKey = string(exchangeCfg.SecretKey)
 		traderConfig.KuCoinPassphrase = string(exchangeCfg.Passphrase)
+	case "mexc":
+		traderConfig.MEXCAPIKey = string(exchangeCfg.APIKey)
+		traderConfig.MEXCSecretKey = string(exchangeCfg.SecretKey)
 	case "hyperliquid":
 		traderConfig.HyperliquidPrivateKey = string(exchangeCfg.APIKey)
 		traderConfig.HyperliquidWalletAddr = exchangeCfg.HyperliquidWalletAddr

@@ -20,6 +20,7 @@ import (
 	"nofx/trader/indodax"
 	"nofx/trader/kucoin"
 	"nofx/trader/lighter"
+	"nofx/trader/mexc"
 	"nofx/trader/okx"
 
 	"github.com/gin-gonic/gin"
@@ -236,6 +237,8 @@ func buildExchangeProbeTrader(exchangeCfg *store.Exchange, userID string) (trade
 		return gate.NewGateTrader(string(exchangeCfg.APIKey), string(exchangeCfg.SecretKey)), nil
 	case "kucoin":
 		return kucoin.NewKuCoinTrader(string(exchangeCfg.APIKey), string(exchangeCfg.SecretKey), string(exchangeCfg.Passphrase)), nil
+	case "mexc":
+		return mexc.NewMEXCTrader(string(exchangeCfg.APIKey), string(exchangeCfg.SecretKey)), nil
 	case "indodax":
 		return indodax.NewIndodaxTrader(string(exchangeCfg.APIKey), string(exchangeCfg.SecretKey)), nil
 	case "hyperliquid":
@@ -320,7 +323,7 @@ func accountAssetForExchange(exchangeType string) string {
 
 func missingExchangeCredentials(exchangeCfg *store.Exchange) (status string, code string, message string, missing bool) {
 	switch exchangeCfg.ExchangeType {
-	case "binance", "bybit", "gate", "indodax":
+	case "binance", "bybit", "gate", "indodax", "mexc":
 		if exchangeCfg.APIKey == "" || exchangeCfg.SecretKey == "" {
 			return exchangeAccountStatusMissingCredentials, "MISSING_REQUIRED_FIELDS", "API key and secret key are required", true
 		}

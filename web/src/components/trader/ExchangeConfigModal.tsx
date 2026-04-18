@@ -31,6 +31,7 @@ const SUPPORTED_EXCHANGE_TEMPLATES = [
   { exchange_type: 'aster', name: 'Aster DEX', type: 'dex' as const },
   { exchange_type: 'lighter', name: 'Lighter', type: 'dex' as const },
   { exchange_type: 'indodax', name: 'Indodax', type: 'cex' as const },
+  { exchange_type: 'mexc', name: 'MEXC Futures', type: 'cex' as const },
 ]
 
 interface ExchangeConfigModalProps {
@@ -505,7 +506,7 @@ export function ExchangeConfigModal({
               </div>
 
               {/* CEX Fields */}
-              {(currentExchangeType === 'binance' || currentExchangeType === 'bybit' || currentExchangeType === 'okx' || currentExchangeType === 'bitget' || currentExchangeType === 'gate' || currentExchangeType === 'kucoin' || currentExchangeType === 'indodax') && (
+              {(currentExchangeType === 'binance' || currentExchangeType === 'bybit' || currentExchangeType === 'okx' || currentExchangeType === 'bitget' || currentExchangeType === 'gate' || currentExchangeType === 'kucoin' || currentExchangeType === 'indodax' || currentExchangeType === 'mexc') && (
                 <>
                   {currentExchangeType === 'binance' && (
                     <div

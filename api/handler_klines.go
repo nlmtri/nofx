@@ -97,6 +97,9 @@ func (s *Server) getKlinesFromCoinank(symbol, interval, exchange string, limit i
 		coinankExchange = coinank_enum.Gate
 	case "aster":
 		coinankExchange = coinank_enum.Aster
+	case "mexc":
+		// MEXC not natively supported by CoinAnk — use Binance data as fallback.
+		coinankExchange = coinank_enum.Binance
 	case "lighter":
 		// Lighter doesn't have direct CoinAnk support, use Binance data as fallback
 		coinankExchange = coinank_enum.Binance

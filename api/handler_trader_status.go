@@ -17,6 +17,7 @@ import (
 	hyperliquidtrader "nofx/trader/hyperliquid"
 	"nofx/trader/kucoin"
 	"nofx/trader/lighter"
+	"nofx/trader/mexc"
 	"nofx/trader/okx"
 
 	"github.com/gin-gonic/gin"
@@ -200,6 +201,11 @@ func (s *Server) handleClosePosition(c *gin.Context) {
 			string(exchangeCfg.SecretKey),
 			string(exchangeCfg.Passphrase),
 		)
+	case "mexc":
+		tempTrader = mexc.NewMEXCTrader(
+			string(exchangeCfg.APIKey),
+			string(exchangeCfg.SecretKey),
+		)
 	case "lighter":
 		if exchangeCfg.LighterWalletAddr != "" && string(exchangeCfg.LighterAPIKeyPrivateKey) != "" {
 			// Lighter only supports mainnet
@@ -282,7 +288,7 @@ func (s *Server) handleClosePosition(c *gin.Context) {
 func (s *Server) recordClosePositionOrder(traderID, exchangeID, exchangeType, symbol, side string, quantity, exitPrice float64, result map[string]interface{}) {
 	// Skip for exchanges with OrderSync - let the background sync handle it to avoid duplicates
 	switch exchangeType {
-	case "binance", "lighter", "hyperliquid", "bybit", "okx", "bitget", "aster", "gate":
+	case "binance", "lighter", "hyperliquid", "bybit", "okx", "bitget", "aster", "gate", "mexc":
 		logger.Infof("  📝 Close order will be synced by OrderSync, skipping immediate record")
 		return
 	}

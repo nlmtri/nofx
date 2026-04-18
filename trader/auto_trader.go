@@ -18,6 +18,7 @@ import (
 	"nofx/trader/indodax"
 	"nofx/trader/kucoin"
 	"nofx/trader/lighter"
+	"nofx/trader/mexc"
 	"nofx/trader/okx"
 	"nofx/wallet"
 	"sync"
@@ -32,7 +33,7 @@ type AutoTraderConfig struct {
 	AIModel string // AI model: "qwen" or "deepseek"
 
 	// Trading platform selection
-	Exchange   string // Exchange type: "binance", "bybit", "okx", "bitget", "gate", "hyperliquid", "aster" or "lighter"
+	Exchange   string // Exchange type: "binance", "bybit", "okx", "bitget", "gate", "hyperliquid", "aster", "mexc" or "lighter"
 	ExchangeID string // Exchange account UUID (for multi-account support)
 
 	// Binance API configuration
@@ -56,6 +57,10 @@ type AutoTraderConfig struct {
 	// Gate API configuration
 	GateAPIKey    string
 	GateSecretKey string
+
+	// MEXC API configuration
+	MEXCAPIKey    string
+	MEXCSecretKey string
 
 	// KuCoin API configuration
 	KuCoinAPIKey     string
@@ -254,6 +259,9 @@ func NewAutoTrader(config AutoTraderConfig, st *store.Store, userID string) (*Au
 	case "kucoin":
 		logger.Infof("🏦 [%s] Using KuCoin Futures trading", config.Name)
 		trader = kucoin.NewKuCoinTrader(config.KuCoinAPIKey, config.KuCoinSecretKey, config.KuCoinPassphrase)
+	case "mexc":
+		logger.Infof("🏦 [%s] Using MEXC Futures trading", config.Name)
+		trader = mexc.NewMEXCTrader(config.MEXCAPIKey, config.MEXCSecretKey)
 	case "hyperliquid":
 		logger.Infof("🏦 [%s] Using Hyperliquid trading", config.Name)
 		trader, err = hyperliquid.NewHyperliquidTrader(config.HyperliquidPrivateKey, config.HyperliquidWalletAddr, config.HyperliquidTestnet, config.HyperliquidUnifiedAcct)
@@ -462,6 +470,14 @@ func (at *AutoTrader) Run() error {
 		if kucoinTrader, ok := at.trader.(*kucoin.KuCoinTrader); ok && at.store != nil {
 			kucoinTrader.StartOrderSync(at.id, at.exchangeID, at.exchange, at.store, 30*time.Second)
 			logger.Infof("🔄 [%s] KuCoin order+position sync enabled (every 30s)", at.name)
+		}
+	}
+
+	// Start MEXC order sync if using MEXC exchange
+	if at.exchange == "mexc" {
+		if mexcTrader, ok := at.trader.(*mexc.MEXCTrader); ok && at.store != nil {
+			mexcTrader.StartOrderSync(at.id, at.exchangeID, at.exchange, at.store, 30*time.Second)
+			logger.Infof("🔄 [%s] MEXC order+position sync enabled (every 30s)", at.name)
 		}
 	}
 

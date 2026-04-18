@@ -176,6 +176,12 @@ func getExchangeNameAndType(exchangeType string) (name string, typ string) {
 		return "LIGHTER DEX", "dex"
 	case "indodax":
 		return "Indodax", "cex"
+	case "mexc":
+		return "MEXC Futures", "cex"
+	case "gate":
+		return "Gate.io Futures", "cex"
+	case "kucoin":
+		return "KuCoin Futures", "cex"
 	default:
 		return exchangeType + " Exchange", "cex"
 	}

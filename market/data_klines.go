@@ -68,6 +68,9 @@ func getKlinesFromCoinAnk(symbol, interval, exchange string, limit int) ([]Kline
 		coinankExchange = coinank_enum.Hyperliquid
 	case "aster":
 		coinankExchange = coinank_enum.Aster
+	case "mexc":
+		// MEXC not natively supported by CoinAnk — fall back to Binance data.
+		coinankExchange = coinank_enum.Binance
 	default:
 		// Default to Binance for unknown exchanges
 		coinankExchange = coinank_enum.Binance

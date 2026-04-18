@@ -265,7 +265,7 @@ func (s *Server) handleCreateExchange(c *gin.Context) {
 	// Validate exchange type
 	validTypes := map[string]bool{
 		"binance": true, "bybit": true, "okx": true, "bitget": true,
-		"hyperliquid": true, "aster": true, "lighter": true, "gate": true, "kucoin": true, "indodax": true,
+		"hyperliquid": true, "aster": true, "lighter": true, "gate": true, "kucoin": true, "indodax": true, "mexc": true,
 	}
 	if !validTypes[req.ExchangeType] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid exchange type: %s", req.ExchangeType)})
@@ -347,6 +347,8 @@ func (s *Server) handleGetSupportedExchanges(c *gin.Context) {
 		{ExchangeType: "okx", Name: "OKX Futures", Type: "cex"},
 		{ExchangeType: "gate", Name: "Gate.io Futures", Type: "cex"},
 		{ExchangeType: "kucoin", Name: "KuCoin Futures", Type: "cex"},
+		{ExchangeType: "bitget", Name: "Bitget Futures", Type: "cex"},
+		{ExchangeType: "mexc", Name: "MEXC Futures", Type: "cex"},
 		{ExchangeType: "hyperliquid", Name: "Hyperliquid", Type: "dex"},
 		{ExchangeType: "aster", Name: "Aster DEX", Type: "dex"},
 		{ExchangeType: "lighter", Name: "LIGHTER DEX", Type: "dex"},

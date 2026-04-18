@@ -18,6 +18,7 @@ const ICON_PATHS: Record<string, string> = {
   aster: '/exchange-icons/aster.svg',
   lighter: '/exchange-icons/lighter.png',
   indodax: '/exchange-icons/indodax.png',
+  mexc: '/exchange-icons/mexc.svg',
 }
 
 // 通用图标组件
@@ -104,7 +105,9 @@ export const getExchangeIcon = (
                     ? 'lighter'
                     : lowerType.includes('indodax')
                       ? 'indodax'
-                      : lowerType
+                      : lowerType.includes('mexc')
+                        ? 'mexc'
+                        : lowerType
 
   const iconProps = {
     width: props.width || 24,
