@@ -32,8 +32,10 @@ type MEXCTrade struct {
 }
 
 // mexcHistoryOrderRaw matches /list/history_orders row shape.
+// MEXC returns orderId as a JSON string (to preserve precision on large IDs),
+// so decode as string here.
 type mexcHistoryOrderRaw struct {
-	OrderID      int64   `json:"orderId"`
+	OrderID      string  `json:"orderId"`
 	Symbol       string  `json:"symbol"`
 	Side         int     `json:"side"` // 1=open long, 2=close short, 3=open short, 4=close long
 	Price        float64 `json:"price"`
@@ -124,7 +126,7 @@ func (t *MEXCTrader) GetTrades(startTime time.Time, limit int) ([]MEXCTrade, err
 
 		trades = append(trades, MEXCTrade{
 			Symbol:      o.Symbol,
-			OrderID:     strconv.FormatInt(o.OrderID, 10),
+			OrderID:     o.OrderID,
 			Side:        side,
 			FillPrice:   o.DealAvgPrice,
 			FillQty:     qty,

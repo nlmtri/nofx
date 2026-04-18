@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"nofx/trader/types"
-	"strconv"
 	"time"
 )
 
@@ -135,7 +134,7 @@ func (t *MEXCTrader) GetClosedPnL(startTime time.Time, limit int) ([]types.Close
 			Leverage:    o.Leverage,
 			EntryTime:   time.UnixMilli(o.CreateTime).UTC(),
 			ExitTime:    time.UnixMilli(o.UpdateTime).UTC(),
-			OrderID:     strconv.FormatInt(o.OrderID, 10),
+			OrderID:     o.OrderID,
 			CloseType:   "unknown",
 		})
 	}
