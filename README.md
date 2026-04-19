@@ -72,6 +72,7 @@ No accounts. No API keys. No prepaid credits. One wallet, every model.
 | **Multi-AI** | DeepSeek, Qwen, GPT, Claude, Gemini, Grok, Kimi, MiniMax — switch anytime |
 | **Multi-Exchange** | Binance, Bybit, OKX, Bitget, KuCoin, Gate, Hyperliquid, Aster, Lighter |
 | **Strategy Studio** | Visual builder — coin sources, indicators, risk controls |
+| **Backtest Lab** | Simulate strategies on historical data before going live ([docs](docs/architecture/BACKTEST_MODULE.md)) |
 | **AI Competition** | AIs compete in real-time, leaderboard ranks performance |
 | **Telegram Agent** | Chat with your trading assistant — streaming, tool calling, memory |
 | **Dashboard** | Live positions, P/L, AI decision logs with Chain of Thought |
@@ -276,6 +277,7 @@ curl -fsSL https://raw.githubusercontent.com/NoFxAiOS/nofx/main/install.sh | bas
 |:--|:--|
 | [Architecture](docs/architecture/README.md) | System design and module index |
 | [Strategy Module](docs/architecture/STRATEGY_MODULE.md) | Coin selection, AI prompts, execution |
+| [Backtest Module](docs/architecture/BACKTEST_MODULE.md) | Historical simulation, metrics, configuration |
 | [FAQ](docs/faq/README.md) | Common questions |
 | [Getting Started](docs/getting-started/README.md) | Deployment guide |
 

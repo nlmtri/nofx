@@ -21,6 +21,7 @@ export const translations = {
     configNav: 'Config',
     dashboardNav: 'Dashboard',
     strategyNav: 'Strategy',
+    backtestNav: 'Backtest',
     faqNav: 'FAQ',
 
     // Footer
@@ -1383,6 +1384,7 @@ export const translations = {
     configNav: '配置',
     dashboardNav: '看板',
     strategyNav: '策略',
+    backtestNav: '回测',
     faqNav: '常见问题',
 
     // Footer
@@ -2685,6 +2687,7 @@ export const translations = {
     configNav: 'Konfigurasi',
     dashboardNav: 'Dasbor',
     strategyNav: 'Strategi',
+    backtestNav: 'Backtest',
     faqNav: 'FAQ',
 
     // Footer

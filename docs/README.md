@@ -83,6 +83,8 @@ Welcome to the NOFX documentation! This page helps you find the right documentat
 |----------|-------------|------|
 | [Architecture Overview (EN)](architecture/README.md) | System architecture, modules, and design | 系统架构、模块和设计 |
 | [Architecture Overview (中文)](architecture/README.zh-CN.md) | 系统架构、模块和设计 | System architecture overview |
+| [Backtest Module (EN)](architecture/BACKTEST_MODULE.md) | Historical simulation, metrics, configuration | 历史回测、指标、配置 |
+| [Backtest Module (中文)](architecture/BACKTEST_MODULE.zh-CN.md) | 历史回测、指标、配置 | Historical simulation module |
 | API Reference *(coming soon)* | HTTP API documentation | HTTP API 文档 |
 | Database Schema *(coming soon)* | SQLite database structure | SQLite 数据库结构 |
 | Testing Guide *(coming soon)* | How to write tests | 如何编写测试 |
