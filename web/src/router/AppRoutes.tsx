@@ -26,6 +26,7 @@ import { SettingsPage } from '../pages/SettingsPage'
 import { StrategyMarketPage } from '../pages/StrategyMarketPage'
 import { StrategyStudioPage } from '../pages/StrategyStudioPage'
 import { TraderDashboardPage } from '../pages/TraderDashboardPage'
+import { BacktestPage } from '../components/backtest/BacktestPage'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useSystemConfig } from '../hooks/useSystemConfig'
@@ -528,6 +529,18 @@ export function AppRoutes() {
             isAuthenticated ? (
               <AppChrome currentPage="strategy" animateContent>
                 <StrategyStudioPage />
+              </AppChrome>
+            ) : (
+              <LandingPage />
+            )
+          }
+        />
+        <Route
+          path={ROUTES.backtest}
+          element={
+            isAuthenticated ? (
+              <AppChrome currentPage="backtest" showFooter={false}>
+                <BacktestPage />
               </AppChrome>
             ) : (
               <LandingPage />
