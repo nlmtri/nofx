@@ -3,6 +3,7 @@ package main
 import (
 	"nofx/api"
 	"nofx/auth"
+	"nofx/backtest"
 	"nofx/config"
 	"nofx/crypto"
 	"nofx/telemetry"
@@ -128,8 +129,17 @@ func main() {
 		}
 	}
 
+	// Initialize backtest persistence and manager
+	sqlDB, _ := st.GormDB().DB()
+	backtest.UseDatabaseWithType(sqlDB, cfg.DBType == "postgres")
+	backtestMgr := backtest.NewManager(nil)
+	if err := backtestMgr.RestoreRuns(); err != nil {
+		logger.Warnf("⚠️ Failed to restore backtest runs: %v", err)
+	}
+	logger.Info("✅ Backtest manager initialized")
+
 	// Start API server
-	server := api.NewServer(traderManager, st, cryptoService, cfg.APIServerPort)
+	server := api.NewServer(traderManager, st, cryptoService, cfg.APIServerPort, backtestMgr)
 
 	// Create hot-reload channel for Telegram bot; wire it to the API server
 	// so that POST /api/telegram can trigger a bot restart when the token changes.

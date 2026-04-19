@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"nofx/auth"
+	"nofx/backtest"
 	"nofx/crypto"
 	"nofx/logger"
 	"nofx/manager"
@@ -26,10 +27,11 @@ type Server struct {
 	httpServer                *http.Server
 	port                      int
 	telegramReloadCh          chan<- struct{} // signal Telegram bot to reload
+	backtestManager           *backtest.Manager
 }
 
 // NewServer Creates API server
-func NewServer(traderManager *manager.TraderManager, st *store.Store, cryptoService *crypto.CryptoService, port int) *Server {
+func NewServer(traderManager *manager.TraderManager, st *store.Store, cryptoService *crypto.CryptoService, port int, backtestMgr *backtest.Manager) *Server {
 	// Set to Release mode (reduce log output)
 	gin.SetMode(gin.ReleaseMode)
 
@@ -48,6 +50,7 @@ func NewServer(traderManager *manager.TraderManager, st *store.Store, cryptoServ
 		cryptoHandler:             cryptoHandler,
 		exchangeAccountStateCache: NewExchangeAccountStateCache(),
 		port:                      port,
+		backtestManager:           backtestMgr,
 	}
 
 	// Setup routes
@@ -356,6 +359,10 @@ Returns the most recent AI decision for each symbol analyzed in the last scan cy
 				`Query: ?trader_id=<EXACT trader_id from GET /api/my-traders>
 Returns: {"total_trades":<int>,"winning_trades":<int>,"win_rate":<float>,"total_pnl":<float>,"sharpe_ratio":<float>,"max_drawdown":<float>}`,
 				s.handleStatistics)
+
+			// Backtest module
+			backtestGroup := protected.Group("/backtest")
+			s.registerBacktestRoutes(backtestGroup)
 
 		}
 	}
