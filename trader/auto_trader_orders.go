@@ -6,8 +6,47 @@ import (
 	"nofx/logger"
 	"nofx/market"
 	"nofx/store"
+	"nofx/trader/types"
 	"time"
 )
+
+// openPositionWithProtection dispatches to TPSLOpener (1-call, position-level TP/SL)
+// when the trader supports it; otherwise falls back to the legacy 3-call flow
+// (OpenX + SetStopLoss + SetTakeProfit with warn-only Set* errors).
+func (at *AutoTrader) openPositionWithProtection(
+	positionSide string, // "LONG" | "SHORT"
+	symbol string, quantity float64, leverage int, stopLoss, takeProfit float64,
+) (map[string]interface{}, error) {
+	if opener, ok := at.trader.(types.TPSLOpener); ok {
+		if stopLoss <= 0 || takeProfit <= 0 {
+			return nil, fmt.Errorf("TPSLOpener requires sl>0 && tp>0, got sl=%f tp=%f", stopLoss, takeProfit)
+		}
+		logger.Infof("  🎯 TPSLOpener path: attaching TP/SL to open order (1 call)")
+		if positionSide == "LONG" {
+			return opener.OpenLongWithTPSL(symbol, quantity, leverage, stopLoss, takeProfit)
+		}
+		return opener.OpenShortWithTPSL(symbol, quantity, leverage, stopLoss, takeProfit)
+	}
+
+	logger.Infof("  🎯 Legacy path: open + SetStopLoss + SetTakeProfit (3 calls)")
+	var order map[string]interface{}
+	var err error
+	if positionSide == "LONG" {
+		order, err = at.trader.OpenLong(symbol, quantity, leverage)
+	} else {
+		order, err = at.trader.OpenShort(symbol, quantity, leverage)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := at.trader.SetStopLoss(symbol, positionSide, quantity, stopLoss); err != nil {
+		logger.Infof("  ⚠ Failed to set stop loss: %v", err)
+	}
+	if err := at.trader.SetTakeProfit(symbol, positionSide, quantity, takeProfit); err != nil {
+		logger.Infof("  ⚠ Failed to set take profit: %v", err)
+	}
+	return order, nil
+}
 
 // executeDecisionWithRecord executes AI decision and records detailed information
 func (at *AutoTrader) executeDecisionWithRecord(decision *kernel.Decision, actionRecord *store.DecisionAction) error {
@@ -114,8 +153,8 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *kernel.Decision, actio
 		// Continue execution, doesn't affect trading
 	}
 
-	// Open position
-	order, err := at.trader.OpenLong(decision.Symbol, quantity, decision.Leverage)
+	// Open position with TP/SL protection (dispatches to TPSLOpener when supported)
+	order, err := at.openPositionWithProtection("LONG", decision.Symbol, quantity, decision.Leverage, decision.StopLoss, decision.TakeProfit)
 	if err != nil {
 		return err
 	}
@@ -133,14 +172,6 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *kernel.Decision, actio
 	// Record position opening time
 	posKey := decision.Symbol + "_long"
 	at.positionFirstSeenTime[posKey] = time.Now().UnixMilli()
-
-	// Set stop loss and take profit
-	if err := at.trader.SetStopLoss(decision.Symbol, "LONG", quantity, decision.StopLoss); err != nil {
-		logger.Infof("  ⚠ Failed to set stop loss: %v", err)
-	}
-	if err := at.trader.SetTakeProfit(decision.Symbol, "LONG", quantity, decision.TakeProfit); err != nil {
-		logger.Infof("  ⚠ Failed to set take profit: %v", err)
-	}
 
 	return nil
 }
@@ -231,8 +262,8 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *kernel.Decision, acti
 		// Continue execution, doesn't affect trading
 	}
 
-	// Open position
-	order, err := at.trader.OpenShort(decision.Symbol, quantity, decision.Leverage)
+	// Open position with TP/SL protection (dispatches to TPSLOpener when supported)
+	order, err := at.openPositionWithProtection("SHORT", decision.Symbol, quantity, decision.Leverage, decision.StopLoss, decision.TakeProfit)
 	if err != nil {
 		return err
 	}
@@ -250,14 +281,6 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *kernel.Decision, acti
 	// Record position opening time
 	posKey := decision.Symbol + "_short"
 	at.positionFirstSeenTime[posKey] = time.Now().UnixMilli()
-
-	// Set stop loss and take profit
-	if err := at.trader.SetStopLoss(decision.Symbol, "SHORT", quantity, decision.StopLoss); err != nil {
-		logger.Infof("  ⚠ Failed to set stop loss: %v", err)
-	}
-	if err := at.trader.SetTakeProfit(decision.Symbol, "SHORT", quantity, decision.TakeProfit); err != nil {
-		logger.Infof("  ⚠ Failed to set take profit: %v", err)
-	}
 
 	return nil
 }

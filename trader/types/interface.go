@@ -104,6 +104,16 @@ type Trader interface {
 	GetOpenOrders(symbol string) ([]OpenOrder, error)
 }
 
+// TPSLOpener — optional capability: exchange supports attaching position-level
+// TP/SL directly into the opening order (1 API call). Exchanges that don't
+// implement this fallback to OpenLong/OpenShort + SetStopLoss + SetTakeProfit
+// (3 API calls, independent plan orders). Position-level TP/SL bind the
+// position → auto-cancel/adjust with position changes.
+type TPSLOpener interface {
+	OpenLongWithTPSL(symbol string, quantity float64, leverage int, stopLoss, takeProfit float64) (map[string]interface{}, error)
+	OpenShortWithTPSL(symbol string, quantity float64, leverage int, stopLoss, takeProfit float64) (map[string]interface{}, error)
+}
+
 // OpenOrder represents a pending order on the exchange
 type OpenOrder struct {
 	OrderID      string  `json:"order_id"`

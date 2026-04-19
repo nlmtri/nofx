@@ -110,8 +110,10 @@ func (t *MEXCTrader) submitOrder(symbol string, side, orderType int, vol int64, 
 	return strings.Trim(string(data), `"`), nil
 }
 
-// OpenLong opens a market long position.
-func (t *MEXCTrader) OpenLong(symbol string, quantity float64, leverage int) (map[string]interface{}, error) {
+// openPosition is the shared open-long/open-short helper.
+// stopLoss/takeProfit > 0 → attach position-level TP/SL to the order (1-call
+// flow used by OpenLongWithTPSL / OpenShortWithTPSL). Zero → plain open.
+func (t *MEXCTrader) openPosition(symbol string, side int, quantity float64, leverage int, stopLoss, takeProfit float64) (map[string]interface{}, error) {
 	sym := t.normalizeSymbol(symbol)
 	t.CancelAllOrders(sym)
 	if err := t.SetLeverage(sym, leverage); err != nil {
@@ -123,14 +125,31 @@ func (t *MEXCTrader) OpenLong(symbol string, quantity float64, leverage int) (ma
 		return nil, fmt.Errorf("invalid quantity → contracts (%f): %v", quantity, err)
 	}
 
-	logger.Infof("  📊 [MEXC] OpenLong: symbol=%s, vol=%d, leverage=%d", sym, vol, leverage)
+	label := "OpenLong"
+	if side == mexcSideOpenShort {
+		label = "OpenShort"
+	}
 
-	orderID, err := t.submitOrder(sym, mexcSideOpenLong, mexcOrderTypeMarket, vol, 0, leverage, nil)
+	var extra map[string]interface{}
+	if stopLoss > 0 || takeProfit > 0 {
+		extra = map[string]interface{}{}
+		if stopLoss > 0 {
+			extra["stopLossPrice"] = stopLoss
+		}
+		if takeProfit > 0 {
+			extra["takeProfitPrice"] = takeProfit
+		}
+		logger.Infof("  📊 [MEXC] %s: symbol=%s, vol=%d, leverage=%d, sl=%.4f, tp=%.4f", label, sym, vol, leverage, stopLoss, takeProfit)
+	} else {
+		logger.Infof("  📊 [MEXC] %s: symbol=%s, vol=%d, leverage=%d", label, sym, vol, leverage)
+	}
+
+	orderID, err := t.submitOrder(sym, side, mexcOrderTypeMarket, vol, 0, leverage, extra)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open long: %w", err)
+		return nil, fmt.Errorf("failed to %s: %w", strings.ToLower(label), err)
 	}
 	t.clearCache()
-	logger.Infof("✓ [MEXC] OpenLong success: %s orderId=%s", sym, orderID)
+	logger.Infof("✓ [MEXC] %s success: %s orderId=%s", label, sym, orderID)
 
 	return map[string]interface{}{
 		"orderId": orderID,
@@ -139,33 +158,32 @@ func (t *MEXCTrader) OpenLong(symbol string, quantity float64, leverage int) (ma
 	}, nil
 }
 
+// OpenLong opens a market long position.
+func (t *MEXCTrader) OpenLong(symbol string, quantity float64, leverage int) (map[string]interface{}, error) {
+	return t.openPosition(symbol, mexcSideOpenLong, quantity, leverage, 0, 0)
+}
+
 // OpenShort opens a market short position.
 func (t *MEXCTrader) OpenShort(symbol string, quantity float64, leverage int) (map[string]interface{}, error) {
-	sym := t.normalizeSymbol(symbol)
-	t.CancelAllOrders(sym)
-	if err := t.SetLeverage(sym, leverage); err != nil {
-		logger.Infof("  ⚠️ [MEXC] set leverage failed: %v", err)
+	return t.openPosition(symbol, mexcSideOpenShort, quantity, leverage, 0, 0)
+}
+
+// OpenLongWithTPSL opens a market long with position-level TP/SL attached (1 API call).
+// Implements types.TPSLOpener. Fails loud when sl<=0 || tp<=0 — callers must fall back
+// to OpenLong + SetStopLoss + SetTakeProfit if they don't have both prices.
+func (t *MEXCTrader) OpenLongWithTPSL(symbol string, quantity float64, leverage int, stopLoss, takeProfit float64) (map[string]interface{}, error) {
+	if stopLoss <= 0 || takeProfit <= 0 {
+		return nil, fmt.Errorf("OpenLongWithTPSL requires sl>0 && tp>0, got sl=%f tp=%f", stopLoss, takeProfit)
 	}
+	return t.openPosition(symbol, mexcSideOpenLong, quantity, leverage, stopLoss, takeProfit)
+}
 
-	vol, err := t.qtyToContracts(sym, quantity)
-	if err != nil || vol <= 0 {
-		return nil, fmt.Errorf("invalid quantity → contracts (%f): %v", quantity, err)
+// OpenShortWithTPSL opens a market short with position-level TP/SL attached (1 API call).
+func (t *MEXCTrader) OpenShortWithTPSL(symbol string, quantity float64, leverage int, stopLoss, takeProfit float64) (map[string]interface{}, error) {
+	if stopLoss <= 0 || takeProfit <= 0 {
+		return nil, fmt.Errorf("OpenShortWithTPSL requires sl>0 && tp>0, got sl=%f tp=%f", stopLoss, takeProfit)
 	}
-
-	logger.Infof("  📊 [MEXC] OpenShort: symbol=%s, vol=%d, leverage=%d", sym, vol, leverage)
-
-	orderID, err := t.submitOrder(sym, mexcSideOpenShort, mexcOrderTypeMarket, vol, 0, leverage, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open short: %w", err)
-	}
-	t.clearCache()
-	logger.Infof("✓ [MEXC] OpenShort success: %s orderId=%s", sym, orderID)
-
-	return map[string]interface{}{
-		"orderId": orderID,
-		"symbol":  sym,
-		"status":  "FILLED",
-	}, nil
+	return t.openPosition(symbol, mexcSideOpenShort, quantity, leverage, stopLoss, takeProfit)
 }
 
 // resolveCloseVol derives vol (contracts) for closing: if quantity=0, query position.
