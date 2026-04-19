@@ -165,11 +165,9 @@ func (t *perUserTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 			globalMetrics.Hits.Add(1)
 			return resp, nil
 		}
-	case strings.Contains(p, pathPositionRisk):
-		if resp, ok := handlePositions(req, t.userID, t.userCache); ok {
-			globalMetrics.Hits.Add(1)
-			return resp, nil
-		}
+	// NOTE: pathPositionRisk intercept removed — Binance doesn't push ACCOUNT_UPDATE
+	// on every mark tick, so cache would go stale. Let REST pass through for fresh PnL.
+	// handlePositions/patchPositions/filterPositionsBySymbol retained for tests + future use.
 	case strings.Contains(p, pathOpenOrders):
 		if resp, ok := handleOpenOrders(req, t.userID, t.userCache); ok {
 			globalMetrics.Hits.Add(1)
